@@ -83,6 +83,11 @@ __PACKAGE__->add_columns(
         'is_nullable'       => 1,
         'size'              => '0'
     },
+    'boolfield' => {
+	'data_type'	    => 'boolean',
+        'name'              => 'boolfield',
+        'default_value'     => \"true", 
+    },
 );
 __PACKAGE__->set_primary_key('id');
 

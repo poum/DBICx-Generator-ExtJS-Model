@@ -121,6 +121,11 @@ eq_or_diff(
                     {   'data_type' => 'date',
                         'name'      => 'timest',
                     },
+ 		    {
+          	        'data_type' => 'boolean',  
+                        'name' => 'boolfield',
+                        'default_value' => \'true',
+                    }   
                 ],
                 'idProperty' => 'id',
             },
