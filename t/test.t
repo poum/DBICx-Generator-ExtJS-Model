@@ -13,6 +13,7 @@ my $schema = My::Schema->connect;
 
 my $generator = DBICx::Generator::ExtJS::Model->new(
     schema    => $schema,
+    appname   => 'MyApp',
     json_args => {
         space_after => 1,
         indent      => 1,
