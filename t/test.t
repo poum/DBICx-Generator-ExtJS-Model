@@ -44,6 +44,12 @@ eq_or_diff(
                     'name'      => 'num',
                 },
             ],
+ 	    'validations' => [
+		{                     
+		  field => 'id',      
+		  type => 'presence',  
+		},                     
+            ],   
             'idProperty' => 'id',
         }
     ],
@@ -75,6 +81,12 @@ eq_or_diff(
                         'name'      => 'num',
                     },
                 ],
+		'validations' => [
+			{                     
+				field => 'id',      
+				type => 'presence',  
+			},                     
+		],   
                 'idProperty' => 'id',
             },
         ],
@@ -127,7 +139,21 @@ eq_or_diff(
                         'defaultValue' => \'true',
                     }   
                 ],
-                'idProperty' => 'id',
+	      'validations' => [                     
+		     {                               
+		       field => 'id',                
+		       type => 'presence',            
+		     },                              
+		     {                               
+		       field => 'title',             
+		       type => 'presence',            
+		     },                              
+		     {                               
+		       field => 'boolfield',         
+		       type => 'presence',            
+		     }                               
+              ],          
+              'idProperty' => 'id',
             },
         ],
     },

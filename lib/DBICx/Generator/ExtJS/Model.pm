@@ -196,7 +196,7 @@ sub extjs_model {
 
     #print "resultsource: $rsrcname -> $extjsname\n";
     my $columns_info = $rsrc->columns_info;
-    my @fields;
+    my (@fields, @validations) = ();
     foreach my $colname ( $rsrc->columns ) {
 
         #print "\tcolumn: $colname\n";
@@ -225,6 +225,11 @@ sub extjs_model {
                 if exists $column_info->{default_value};
         }
         push @fields, $field_params;
+
+	# Add presence validations
+	unless ($column_info->{is_nullable}) {
+		push @validations, { type => 'presence', field => $colname };
+	}
     }
 
     my @pk = $rsrc->primary_columns;
@@ -313,6 +318,9 @@ sub extjs_model {
     }
     $model->{associations} = \@assocs
         if @assocs;
+
+    $model->{validations} = \@validations
+	if @validations;
 
     # override any generated config properties
     if ( $self->extjs_args ) {
