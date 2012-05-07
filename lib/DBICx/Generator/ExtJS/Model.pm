@@ -205,7 +205,7 @@ sub extjs_model {
 
         # views might not have column infos
         if ( not %$column_info ) {
-            $field_params->{data_type} = 'auto';
+            $field_params->{type} = 'auto';
         }
         else {
             my $data_type = lc( $column_info->{data_type} );
@@ -218,10 +218,10 @@ sub extjs_model {
                         if exists $column_info->{size}
                             && $column_info->{size} !~ /,/;
                 }
-                $field_params->{data_type} = $extjs_data_type;
+                $field_params->{type} = $extjs_data_type;
             }
 
-            $field_params->{default_value} = $column_info->{default_value}
+            $field_params->{defaultValue} = $column_info->{default_value}
                 if exists $column_info->{default_value};
         }
         push @fields, $field_params;
