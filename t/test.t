@@ -76,6 +76,30 @@ eq_or_diff(
 "'Another' model ok"
 );
 
+my $extjs_controller_for_another;
+lives_ok { $extjs_controller_for_another = $generator->extjs_controller('Another') }
+"generation of 'Another' successful";
+eq_or_diff(
+    $extjs_controller_for_another,
+		[                                                                            
+		  'Another',                                                                 
+		  {                                                                          
+			extend => 'Ext.data.Controller',                                         
+			init => 'function() { console.info(\'Another controller started\'); }',  
+			models => [                                                              
+			  'Another'                                                              
+			],                                                                       
+			stores => [                                                              
+			  'Another'                                                              
+			],                                                                       
+			views => [                                                               
+			  'another.Form'                                                         
+			]                                                                        
+		  }                                                                          
+		],
+"'Another' controller ok"
+);
+
 my $extjs_models;
 lives_ok { $extjs_models = $generator->extjs_models; }
 'generation successful';
@@ -223,6 +247,48 @@ eq_or_diff(
     "extjs_stores output ok"
 );
 
+my $extjs_controllers;
+lives_ok { $extjs_controllers = $generator->extjs_controllers; }
+'generation successful';
+eq_or_diff(
+    $extjs_controllers,
+{                                                                              
+		  Another => [                                                                 
+			'Another',                                                                 
+			{                                                                          
+			  extend => 'Ext.data.Controller',                                         
+			  init => 'function() { console.info(\'Another controller started\'); }',  
+			  models => [                                                              
+				'Another'                                                              
+			  ],                                                                       
+			  stores => [                                                              
+				'Another'                                                              
+			  ],                                                                       
+			  views => [                                                               
+				'another.Form'                                                         
+			  ]                                                                        
+			}                                                                          
+		  ],                                                                           
+		  Basic => [                                                                   
+			'Basic',                                                                   
+			{                                                                          
+			  extend => 'Ext.data.Controller',                                         
+			  init => 'function() { console.info(\'Basic controller started\'); }',    
+			  models => [                                                              
+				'Basic'                                                                
+			  ],                                                                       
+			  stores => [                                                              
+				'Basic'                                                                
+			  ],                                                                       
+			  views => [                                                               
+				'basic.Form'                                                           
+			  ]                                                                        
+			}                                                                          
+		  ]                                                                            
+	},
+    "extjs_controllers output ok"
+);
+
 # this creates a File::Temp object which immediatly goes out of scope and
 # results in deleting of the dir
 my $non_existing_dirname = File::Temp->newdir->dirname;
@@ -266,9 +332,28 @@ my $non_existing_dirname = File::Temp->newdir->dirname;
 {
     my $dir = File::Temp->newdir;
     my $dirname = $dir->dirname;
+    diag("writing 'Another' controller to $dirname");
+    lives_ok { $generator->extjs_controller_to_file( 'Another', $dirname ) }
+    "controller file generation of 'Another' ok";
+}
+
+{
+    my $dir = File::Temp->newdir;
+    my $dirname = $dir->dirname;
+    diag("writing all controllers to $dirname");
+    lives_ok { $generator->extjs_controllers_to_file( $dirname ) }
+    "file generation of all controllers ok";
+}
+
+{
+    my $dir = File::Temp->newdir;
+    my $dirname = $dir->dirname;
+	$dirname = 'MVC';
     diag("writing all to $dirname");
     lives_ok { $generator->extjs_MVC_to_file( $dirname ) }
     "file generation of all ok";
 }
+
+ok(1 == 2);
 
 done_testing;

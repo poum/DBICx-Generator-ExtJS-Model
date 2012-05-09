@@ -216,6 +216,18 @@ sub extjs_model {
 	_extjs_type(@_, 'model');
 }
 
+=item extjs_controller
+
+This method returns an arrayref containing the controller parameters that can be
+serialized to JSON and then passed to Ext.define for one
+DBIx::Class::ResultSource.
+
+=cut
+
+sub extjs_controller {
+	_extjs_type(@_, 'controller');
+}
+
 =item extjs_store
 
 This method returns an arrayref containing the store parameters that can be
@@ -265,6 +277,16 @@ sub _extjs_generate {
 		type => 'ajax',
         url  => "/$extjsname"
 	 }
+	};
+
+	my $controller = {
+	 extend => 'Ext.data.Controller',
+
+	 stores => [ $extjsname ],
+     models => [ $extjsname ],
+     views  => [ lc($extjsname) . '.Form' ],
+
+     init   => qq/function() { console.info('$extjsname controller started'); }/
 	};
 
     my $columns_info = $rsrc->columns_info;
@@ -399,6 +421,7 @@ sub _extjs_generate {
 		extjsname => $extjsname,
 		model => $model,
         store => $store,
+        controller => $controller,
 	};
 }
 
@@ -441,6 +464,28 @@ sub extjs_stores {
         my $extjs_store = $self->extjs_store($rsrcname);
 
         $output{ $extjs_store->[0] } = $extjs_store;
+    }
+
+    return \%output;
+}
+
+=item extjs_controllers
+
+This method returns the generated ExtJS controller classes as hashref indexed by
+their ExtJS names.
+
+=cut
+
+sub extjs_controllers {
+    my $self = shift;
+
+    my $schema = $self->schema;
+
+    my %output;
+    foreach my $rsrcname ( $schema->sources ) {
+        my $extjs_controller = $self->extjs_controller($rsrcname);
+
+        $output{ $extjs_controller->[0] } = $extjs_controller;
     }
 
     return \%output;
@@ -574,6 +619,56 @@ sub extjs_stores_to_file {
     $self->extjs_store_to_file( $_, $dirname ) for $schema->sources;
 }
 
+=item extjs_controller_to_file
+
+This method takes a single DBIx::Class::ResultSource name and a directory name
+and outputs the generated ExtJS controller class to a file according to ExtJS
+naming standards.
+An error is thrown if the file already exists.
+If last path directory is'nt 'controller', a controller subdirectory is added.
+
+=cut
+
+sub extjs_controller_to_file {
+    my ( $self, $rsrcname, $dirname ) = @_;
+
+    my $dir = $self->_get_dir($dirname,'controller');
+
+    my ( $extjs_controller_name, $extjs_controller_code ) =
+        @{ $self->extjs_controller($rsrcname) };
+
+    my $json =
+        'Ext.define('
+        . $self->_json->to_json(
+        $self->appname . '.controller.' . $extjs_controller_name )
+        . ', '
+        . $self->_json->to_json($extjs_controller_code) . ');';
+
+    my $file = $dir->file("$extjs_controller_name.js");
+
+    my $fh   = $file->open( O_CREAT | O_WRONLY | O_EXCL )
+        or croak "$file already exists: $!";
+
+    $fh->write($json);
+}
+
+=item extjs_controllers_to_file
+
+This method takes a directory name and outputs the generated ExtJS controller
+classes to a file per controller according to ExtJS naming standards.
+An error is thrown if the file already exists.
+If last path directory is'nt 'controller', a controller subdirectory is added.
+
+=cut
+
+sub extjs_controllers_to_file {
+    my ( $self, $dirname ) = @_;
+
+    my $schema = $self->schema;
+
+    $self->extjs_controller_to_file( $_, $dirname ) for $schema->sources;
+}
+
 =item extjs_MVC_to_file
 
 This method takes a directory name and outputs the generated model,
@@ -588,8 +683,8 @@ sub extjs_MVC_to_file {
 
 	$self->extjs_models_to_file($dirname);
     $self->extjs_stores_to_file($dirname);
-	carp 'controllers are not yet mplemented ...';
-	carp 'form and grid/tree view are not yet implemented ...';
+    $self->extjs_controllers_to_file($dirname);
+	carp 'TODO: form and grid/tree view are not yet implemented ...';
 }
 
 =back
