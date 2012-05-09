@@ -43,11 +43,12 @@ At the moment only version 4 of the ExtJS framework is supported.
 
 =head1 SEE ALSO
 
-F<http://docs.sencha.com/ext-js/4-0/#/api/Ext.data.Model> for
+F<http://docs.sencha.com/ext-js/4-1/#/api/Ext.data.Model> for
 ExtJS model documentation.
 
 =cut
 
+use Carp;
 use Moose;
 use JSON::DWIW;
 use Path::Class;
@@ -71,6 +72,12 @@ has '_json' => (
     isa        => 'JSON::DWIW',
     lazy_build => 1,
 );
+
+has '_path' => (
+	is         => 'ro',
+    isa        => 'HashRef',
+	default    => sub { {}; }
+); 
 
 sub _build__json {
     my $self = shift;
@@ -194,12 +201,10 @@ sub extjs_model {
     my $rsrc      = $schema->source($rsrcname);
     my $extjsname = $self->extjs_model_name($rsrcname);
 
-    #print "resultsource: $rsrcname -> $extjsname\n";
     my $columns_info = $rsrc->columns_info;
     my (@fields, @validations) = ();
     foreach my $colname ( $rsrc->columns ) {
 
-        #print "\tcolumn: $colname\n";
         my $field_params = { name => $colname };
         my $column_info = $columns_info->{$colname};
 
@@ -218,6 +223,13 @@ sub extjs_model {
                         if exists $column_info->{size}
                             && $column_info->{size} !~ /,/;
                 }
+		# Check for max size validation for string columns
+		elsif ($extjs_data_type eq 'string'
+                   and exists $column_info->{size}
+                   and $column_info->{size} > 0) {
+			push @validations, { type => 'length', field => $colname, max => $column_info->{size} };
+		}
+
                 $field_params->{type} = $extjs_data_type;
             }
 
@@ -244,13 +256,9 @@ sub extjs_model {
     my @assocs;
     foreach my $relname ( $rsrc->relationships ) {
 
-        # print "\trel: $relname\n";
         my $relinfo = $rsrc->relationship_info($relname);
 
-        # use Data::Dumper;
-        # print Dumper($relinfo);
-        print
-            "\t\tskipping because multi-cond rels aren't supported by ExtJS 4\n"
+        carp "\t\tskipping because multi-cond rels aren't supported by ExtJS 4\n" 
             if keys %{ $relinfo->{cond} } > 1;
 
         my $attrs = $relinfo->{attrs};
@@ -353,6 +361,34 @@ sub extjs_models {
     return \%output;
 }
 
+# This method groups the directory check/creation operation needed
+# for generation
+# created dir are cached in _path hashref
+
+sub _get_dir {
+	my ($self, $dirname, $type) = @_;
+
+	my $dir;
+	if (exists $self->_path->{$dirname . '/' . $type}) {
+		$dir = $self->_path->{$dirname . '/' . $type};
+	}
+	else {
+			$dir = dir($dirname);
+			if ($type) {
+				my @dirs = $dir->dir_list;
+				if ($dirs[-1] ne $type) {
+						$dir = dir($dir,$type);
+				}
+			}
+						
+			$dir->mkpath(0, 0750) or croak "Unable to mkpath $dir: $!";
+		
+			$self->_path->{$dirname . '/' . $type} = $dir;
+	}
+
+	return $dir;
+}
+
 =item extjs_model_to_file
 
 This method takes a single DBIx::Class::ResultSource name and a directory name
@@ -366,8 +402,7 @@ exists.
 sub extjs_model_to_file {
     my ( $self, $rsrcname, $dirname ) = @_;
 
-    my $dir = Path::Class::Dir->new($dirname);
-    $dir->open or die "directory doesn't exist";
+    my $dir = $self->_get_dir($dirname,'model');
 
     my ( $extjs_model_name, $extjs_model_code ) =
         @{ $self->extjs_model($rsrcname) };
@@ -380,8 +415,9 @@ sub extjs_model_to_file {
         . $self->_json->to_json($extjs_model_code) . ');';
 
     my $file = $dir->file("$extjs_model_name.js");
+
     my $fh   = $file->open( O_CREAT | O_WRONLY | O_EXCL )
-        or die "$file already exists";
+        or croak "$file already exists: $!";
 
     $fh->write($json);
 }
@@ -399,6 +435,43 @@ sub extjs_models_to_file {
     my $schema = $self->schema;
 
     $self->extjs_model_to_file( $_, $dirname ) for $schema->sources;
+}
+
+=item extjs_store_to_file
+
+=cut
+
+sub extjs_store_to_file {
+}
+
+=item extjs_stores_to_file
+
+This method takes a directory name and outputs the generated ExtJS store
+classes to a file per store according to ExtJS naming standards.
+
+=cut
+
+sub extjs_stores_to_file {
+    my ( $self, $dirname ) = @_;
+
+    my $schema = $self->schema;
+
+    $self->extjs_store_to_file( $_, $dirname ) for $schema->sources;
+}
+
+=item extjs_MVC_to_file
+
+This method takes a directory name and outputs the generated model,
+store, controller, and view - form and list or tree - classes to a
+file per class according to naming standards.
+
+=cut
+
+sub extjs_MVC_to_file {
+    my ( $self, $dirname ) = @_;
+
+	$self->extjs_models_to_file($dirname);
+    $self->extjs_stores_to_file($dirname);
 }
 
 =back
