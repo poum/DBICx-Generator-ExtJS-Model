@@ -56,10 +56,29 @@ eq_or_diff(
     "'Another' model ok"
 );
 
+my $extjs_store_for_another;
+lives_ok { $extjs_store_for_another = $generator->extjs_store('Another') }
+"generation of 'Another' successful";
+eq_or_diff(
+    $extjs_store_for_another,
+	[                                    
+		'Another',                         
+		{                                  
+				autoload => 'true',              
+				extend => 'Ext.data.Store',      
+				model => 'MyApp.model.Another',  
+				proxy => {                       
+						type => 'ajax',                
+						url => '/Another'              
+				}    
+		}
+	],
+"'Another' model ok"
+);
+
 my $extjs_models;
 lives_ok { $extjs_models = $generator->extjs_models; }
 'generation successful';
-
 eq_or_diff(
     $extjs_models,
     {   'Another' => [
@@ -170,6 +189,40 @@ eq_or_diff(
     "extjs_models output ok"
 );
 
+my $extjs_stores;
+lives_ok { $extjs_stores = $generator->extjs_stores; }
+'generation successful';
+eq_or_diff(
+    $extjs_stores,
+	{
+		Another => [                         
+		  'Another',                         
+		  {                                  
+			autoload => 'true',              
+			extend => 'Ext.data.Store',      
+			model => 'MyApp.model.Another',  
+			proxy => {                       
+			  type => 'ajax',                
+			  url => '/Another'              
+			}                                
+		  }                                  
+		],                                   
+		Basic => [                           
+		  'Basic',                           
+		  {                                  
+			autoload => 'true',              
+			extend => 'Ext.data.Store',      
+			model => 'MyApp.model.Basic',    
+			proxy => {                       
+			  type => 'ajax',                
+			  url => '/Basic'                
+			}                                
+		  }                                  
+		]                                    
+	},
+    "extjs_stores output ok"
+);
+
 # this creates a File::Temp object which immediatly goes out of scope and
 # results in deleting of the dir
 my $non_existing_dirname = File::Temp->newdir->dirname;
@@ -183,7 +236,7 @@ my $non_existing_dirname = File::Temp->newdir->dirname;
     my $dirname = $dir->dirname;
     diag("writing 'Another' to $dirname");
     lives_ok { $generator->extjs_model_to_file( 'Another', $dirname ) }
-    "file generation of 'Another' ok";
+    "model file generation of 'Another' ok";
 }
 
 {
@@ -192,6 +245,30 @@ my $non_existing_dirname = File::Temp->newdir->dirname;
     diag("writing all models to $dirname");
     lives_ok { $generator->extjs_models_to_file( $dirname ) }
     "file generation of all models ok";
+}
+
+{
+    my $dir = File::Temp->newdir;
+    my $dirname = $dir->dirname;
+    diag("writing 'Another' store to $dirname");
+    lives_ok { $generator->extjs_store_to_file( 'Another', $dirname ) }
+    "store file generation of 'Another' ok";
+}
+
+{
+    my $dir = File::Temp->newdir;
+    my $dirname = $dir->dirname;
+    diag("writing all stores to $dirname");
+    lives_ok { $generator->extjs_stores_to_file( $dirname ) }
+    "file generation of all stores ok";
+}
+
+{
+    my $dir = File::Temp->newdir;
+    my $dirname = $dir->dirname;
+    diag("writing all to $dirname");
+    lives_ok { $generator->extjs_MVC_to_file( $dirname ) }
+    "file generation of all ok";
 }
 
 done_testing;

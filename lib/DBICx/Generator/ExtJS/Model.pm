@@ -20,7 +20,8 @@ DBICx::Generator::ExtJS::Model - ExtJS model producer
         # this are the default args passed to JSON::DWIW->new
         json_args => {
             bare_keys => 1,
-            pretty    => 1,
+			bare_solidus => 1,
+            pretty    => 1
         },
         extjs_args => {
             extend => 'MyApp.data.Model',
@@ -34,6 +35,16 @@ DBICx::Generator::ExtJS::Model - ExtJS model producer
     $generator->extjs_model_to_file( 'Foo', '/my/dir/' );
 
     $generator->extjs_models_to_file( '/my/dir/' );
+
+    my $extjs_store_for_foo = $generator->extjs_store('Foo');
+
+    my @extjs_stores = $generator->extjs_stores;
+
+    $generator->extjs_store_to_file( 'Foo', '/my/dir/' );
+
+    $generator->extjs_stores_to_file( '/my/dir/' );
+
+    $generator->extjs_MVC_to_file( '/my/dir/' );
 
 =head1 DESCRIPTION
 
@@ -79,6 +90,12 @@ has '_path' => (
 	default    => sub { {}; }
 ); 
 
+has '_extjs_build' => (
+	is         => 'ro',
+    isa        => 'HashRef',
+    default    => sub { {}; }
+);
+
 sub _build__json {
     my $self = shift;
 
@@ -90,6 +107,7 @@ has 'json_args' => (
     isa     => 'HashRef',
     default => sub {
         {   bare_keys => 1,
+			bare_solidus => 1,
             pretty    => 1,
         };
     },
@@ -188,18 +206,66 @@ sub extjs_model_name {
 
 =item extjs_model
 
-This method returns an arrayref containing the parameters that can be
+This method returns an arrayref containing the model parameters that can be
 serialized to JSON and then passed to Ext.define for one
 DBIx::Class::ResultSource.
 
 =cut
 
 sub extjs_model {
+	_extjs_type(@_, 'model');
+}
+
+=item extjs_store
+
+This method returns an arrayref containing the store parameters that can be
+serialized to JSON and then passed to Ext.define for one
+DBIx::Class::ResultSource.
+
+=cut
+
+sub extjs_store {
+	_extjs_type(@_, 'store');
+}
+
+# This method returns an arrayref containing the type parameters that can be
+# serialized to JSON and then passed to Ext.define for one
+# DBIx::Class::ResultSource.
+#
+# type: model, store
+sub _extjs_type {
+	my ($self, $rsrcname, $type) = @_;
+
+	my $build = $self->_extjs_build;
+
+	$self->_extjs_generate($rsrcname)
+		unless exists $build->{$rsrcname};
+
+	return [ $build->{$rsrcname}->{extjsname}, $build->{$rsrcname}->{$type} ];
+}
+
+sub _extjs_generate {
     my ( $self, $rsrcname ) = @_;
     my $schema = $self->schema;
 
     my $rsrc      = $schema->source($rsrcname);
     my $extjsname = $self->extjs_model_name($rsrcname);
+
+    my @pk = $rsrc->primary_columns;
+
+    my $model = { extend => 'Ext.data.Model' };
+    $model->{idProperty} = $pk[0]
+        if @pk == 1;
+
+	my $store = {
+	 extend => 'Ext.data.Store',
+     model  => $self->appname . '.model.' . $extjsname,
+	 autoload => 'true',
+	 proxy => {
+		type => 'ajax',
+        url  => "/$extjsname"
+	 }
+	};
 
     my $columns_info = $rsrc->columns_info;
     my (@fields, @validations) = ();
@@ -238,20 +304,13 @@ sub extjs_model {
         }
         push @fields, $field_params;
 
-	# Add presence validations
-	unless ($column_info->{is_nullable}) {
-		push @validations, { type => 'presence', field => $colname };
-	}
+		# Add presence validations
+		unless ($column_info->{is_nullable}) {
+			push @validations, { type => 'presence', field => $colname };
+		}
     }
 
-    my @pk = $rsrc->primary_columns;
-
-    my $model = {
-        extend => 'Ext.data.Model',
-        fields => \@fields,
-    };
-    $model->{idProperty} = $pk[0]
-        if @pk == 1;
+	$model->{fields} = \@fields;
 
     my @assocs;
     foreach my $relname ( $rsrc->relationships ) {
@@ -336,7 +395,11 @@ sub extjs_model {
         $model = \%foo;
     }
 
-    return [ $extjsname, $model ];
+	$self->_extjs_build->{$rsrcname} = { 
+		extjsname => $extjsname,
+		model => $model,
+        store => $store,
+	};
 }
 
 =item extjs_models
@@ -356,6 +419,28 @@ sub extjs_models {
         my $extjs_model = $self->extjs_model($rsrcname);
 
         $output{ $extjs_model->[0] } = $extjs_model;
+    }
+
+    return \%output;
+}
+
+=item extjs_stores
+
+This method returns the generated ExtJS store classes as hashref indexed by
+their ExtJS names.
+
+=cut
+
+sub extjs_stores {
+    my $self = shift;
+
+    my $schema = $self->schema;
+
+    my %output;
+    foreach my $rsrcname ( $schema->sources ) {
+        my $extjs_store = $self->extjs_store($rsrcname);
+
+        $output{ $extjs_store->[0] } = $extjs_store;
     }
 
     return \%output;
@@ -394,8 +479,8 @@ sub _get_dir {
 This method takes a single DBIx::Class::ResultSource name and a directory name
 and outputs the generated ExtJS model class to a file according to ExtJS
 naming standards.
-An error is thrown if the directory doesn't exist or if the file already
-exists.
+An error is thrown if the file already exists.
+If last path directory is'nt 'model', a model subdirectory is added.
 
 =cut
 
@@ -426,6 +511,8 @@ sub extjs_model_to_file {
 
 This method takes a directory name and outputs the generated ExtJS model
 classes to a file per model according to ExtJS naming standards.
+An error is thrown if the file already exists.
+If last path directory is'nt 'model', a model subdirectory is added.
 
 =cut
 
@@ -439,15 +526,43 @@ sub extjs_models_to_file {
 
 =item extjs_store_to_file
 
+This method takes a single DBIx::Class::ResultSource name and a directory name
+and outputs the generated ExtJS store class to a file according to ExtJS
+naming standards.
+An error is thrown if the file already exists.
+If last path directory is'nt 'store', a store subdirectory is added.
+
 =cut
 
 sub extjs_store_to_file {
+    my ( $self, $rsrcname, $dirname ) = @_;
+
+    my $dir = $self->_get_dir($dirname,'store');
+
+    my ( $extjs_store_name, $extjs_store_code ) =
+        @{ $self->extjs_store($rsrcname) };
+
+    my $json =
+        'Ext.define('
+        . $self->_json->to_json(
+        $self->appname . '.store.' . $extjs_store_name )
+        . ', '
+        . $self->_json->to_json($extjs_store_code) . ');';
+
+    my $file = $dir->file("$extjs_store_name.js");
+
+    my $fh   = $file->open( O_CREAT | O_WRONLY | O_EXCL )
+        or croak "$file already exists: $!";
+
+    $fh->write($json);
 }
 
 =item extjs_stores_to_file
 
 This method takes a directory name and outputs the generated ExtJS store
 classes to a file per store according to ExtJS naming standards.
+An error is thrown if the file already exists.
+If last path directory is'nt 'store', a store subdirectory is added.
 
 =cut
 
@@ -464,6 +579,7 @@ sub extjs_stores_to_file {
 This method takes a directory name and outputs the generated model,
 store, controller, and view - form and list or tree - classes to a
 file per class according to naming standards.
+model, store, view and controller subdirectories are automatically added.
 
 =cut
 
@@ -472,8 +588,12 @@ sub extjs_MVC_to_file {
 
 	$self->extjs_models_to_file($dirname);
     $self->extjs_stores_to_file($dirname);
+	carp 'controllers are not yet mplemented ...';
+	carp 'form and grid/tree view are not yet implemented ...';
 }
 
 =back
+
+=cut
 
 1;
